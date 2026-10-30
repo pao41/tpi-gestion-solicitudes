@@ -7,7 +7,8 @@ import pytest
 # Agrega la carpeta del proyecto para poder importar el sistema
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from sistema_solicitudes import GestorSolicitudes
+from sistema_solicitudes import GestorSolicitudes, SolicitudNueva
+from repositorio import RepositorioJSON
 
 
 # ---------- Preparación común ----------
@@ -16,13 +17,13 @@ from sistema_solicitudes import GestorSolicitudes
 def gestor(tmp_path, monkeypatch):
     # Ejecuta cada prueba en una carpeta temporal con un archivo JSON limpio
     monkeypatch.chdir(tmp_path)
-    return GestorSolicitudes()
+    return GestorSolicitudes(RepositorioJSON("solicitudes.json"))
 
 
 def registrar(gestor, legajo="10234", nombre="Ana Perez", email="ana.perez@mail.com",
               tipo="CERTIFICADO", prioridad="ALTA", descripcion="Certificado de alumno regular"):
     # Centraliza la llamada al registro para que un cambio de firma se ajuste en un solo lugar
-    return gestor.registrar_solicitud(legajo, nombre, email, tipo, prioridad, descripcion)
+    return gestor.registrar_solicitud(SolicitudNueva(legajo, nombre, email, tipo, prioridad, descripcion))
 
 
 def leer_datos():
@@ -246,7 +247,7 @@ def test_datos_se_conservan_al_reiniciar(gestor):
     # Arrange
     registrar(gestor)
     # Act: se crea un nuevo gestor, como si se reiniciara la aplicación
-    otro_gestor = GestorSolicitudes()
+    otro_gestor = GestorSolicitudes(RepositorioJSON("solicitudes.json"))
     resultado = otro_gestor.buscar("legajo", "10234")
     # Assert
     assert len(resultado) == 1

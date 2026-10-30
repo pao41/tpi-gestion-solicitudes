@@ -1,13 +1,29 @@
-import json
+from dataclasses import dataclass
 from datetime import datetime
+
+from repositorio import RepositorioJSON
+
+
+@dataclass
+class SolicitudNueva:
+    # Agrupa los datos necesarios para registrar una solicitud
+    legajo: str
+    nombre: str
+    email: str
+    tipo: str
+    prioridad: str
+    descripcion: str
 
 
 class GestorSolicitudes:
 
-    def __init__(self):
-        self.d = {"estudiantes": [], "responsables": [], "solicitudes": []}
-        self.cargar()
-        # Carga responsables iniciales si el archivo esta vacio
+    def __init__(self, repositorio):
+        # Recibe el repositorio que se encarga de guardar los datos
+        self.repositorio = repositorio
+        self.d = self.repositorio.cargar()
+        if self.d is None:
+            self.d = {"estudiantes": [], "responsables": [], "solicitudes": []}
+        # Carga responsables iniciales si no hay ninguno
         if len(self.d["responsables"]) == 0:
             self.d["responsables"] = [
                 {"id": 1, "nombre": "Laura Gomez", "area": "BEDELIA"},
@@ -16,82 +32,102 @@ class GestorSolicitudes:
             ]
             self.guardar()
 
-    def cargar(self):
-        try:
-            f = open("solicitudes.json", "r", encoding="utf-8")
-            self.d = json.load(f)
-            f.close()
-        except:
-            pass
-
     def guardar(self):
-        f = open("solicitudes.json", "w", encoding="utf-8")
-        json.dump(self.d, f, indent=4, ensure_ascii=False)
-        f.close()
+        # Delega el guardado de los datos en el repositorio
+        self.repositorio.guardar(self.d)
 
-    def registrar_solicitud(self, legajo, nombre, email, tipo, prioridad, descripcion):
-        # Valida los datos del estudiante
+    def validar_legajo(self, legajo):
+        # Verifica que el legajo tenga cinco digitos
         if legajo == "" or len(legajo) != 5 or not legajo.isdigit():
             print("Error: legajo invalido")
-            return -1
-        if nombre == "":
+            return False
+        return True
+
+    def validar_estudiante(self, solicitud):
+        # Valida los datos del estudiante
+        if not self.validar_legajo(solicitud.legajo):
+            return False
+        if solicitud.nombre == "":
             print("Error: nombre vacio")
-            return -1
-        if "@" not in email or "." not in email:
+            return False
+        if "@" not in solicitud.email or "." not in solicitud.email:
             print("Error: email invalido")
-            return -1
+            return False
+        return True
+
+    def validar_solicitud(self, solicitud):
         # Valida los datos de la solicitud
+        tipo = solicitud.tipo
+        prioridad = solicitud.prioridad
         if tipo != "CERTIFICADO" and tipo != "EQUIVALENCIA" and tipo != "RECLAMO" and tipo != "CONSTANCIA":
             print("Error: tipo invalido")
-            return -1
+            return False
         if prioridad != "ALTA" and prioridad != "MEDIA" and prioridad != "BAJA":
             print("Error: prioridad invalida")
-            return -1
-        if descripcion == "":
+            return False
+        if solicitud.descripcion == "":
             print("Error: descripcion vacia")
-            return -1
-        # Busca el estudiante y lo agrega si no existe
-        est = None
+            return False
+        return True
+
+    def buscar_o_crear_estudiante(self, solicitud):
+        # Busca el estudiante por legajo y lo agrega si no existe
         for e in self.d["estudiantes"]:
-            if e["legajo"] == legajo:
-                est = e
-        if est == None:
-            est = {"legajo": legajo, "nombre": nombre, "email": email}
-            self.d["estudiantes"].append(est)
-        # Calcula el siguiente id
+            if e["legajo"] == solicitud.legajo:
+                return e
+        est = {"legajo": solicitud.legajo, "nombre": solicitud.nombre, "email": solicitud.email}
+        self.d["estudiantes"].append(est)
+        return est
+
+    def generar_id(self):
+        # Calcula el siguiente id disponible
         n = 1
         for s in self.d["solicitudes"]:
             if s["id"] >= n:
                 n = s["id"] + 1
+        return n
+
+    def calcular_plazo(self, prioridad):
+        # Devuelve los dias de plazo segun la prioridad
+        if prioridad == "ALTA":
+            return 2
+        elif prioridad == "MEDIA":
+            return 5
+        else:
+            return 10
+
+    def buscar_solicitud(self, id):
+        # Devuelve la solicitud con el id indicado o None si no existe
+        for x in self.d["solicitudes"]:
+            if x["id"] == id:
+                return x
+        return None
+
+    def registrar_solicitud(self, solicitud):
+        if not self.validar_estudiante(solicitud):
+            return -1
+        if not self.validar_solicitud(solicitud):
+            return -1
+        self.buscar_o_crear_estudiante(solicitud)
+        n = self.generar_id()
         s = {
             "id": n,
-            "legajo": legajo,
-            "tipo": tipo,
-            "prioridad": prioridad,
-            "descripcion": descripcion,
+            "legajo": solicitud.legajo,
+            "tipo": solicitud.tipo,
+            "prioridad": solicitud.prioridad,
+            "descripcion": solicitud.descripcion,
             "estado": "PENDIENTE",
             "responsable": None,
             "fecha": datetime.now().strftime("%d/%m/%Y"),
+            "plazo": self.calcular_plazo(solicitud.prioridad),
         }
-        # Asigna los dias de plazo segun la prioridad
-        if prioridad == "ALTA":
-            s["plazo"] = 2
-        elif prioridad == "MEDIA":
-            s["plazo"] = 5
-        else:
-            s["plazo"] = 10
         self.d["solicitudes"].append(s)
-        f = open("solicitudes.json", "w", encoding="utf-8")
-        json.dump(self.d, f, indent=4, ensure_ascii=False)
-        f.close()
+        self.guardar()
         print("Solicitud registrada con id", n)
         return n
 
     def cambiar_estado(self, id, nuevo):
-        s = None
-        for x in self.d["solicitudes"]:
-            if x["id"] == id:
-                s = x
+        s = self.buscar_solicitud(id)
         if s == None:
             print("Error: la solicitud no existe")
             return False
@@ -116,17 +152,12 @@ class GestorSolicitudes:
         elif s["estado"] == "RESUELTA" or s["estado"] == "RECHAZADA":
             print("Error: la solicitud ya esta cerrada")
             return False
-        f = open("solicitudes.json", "w", encoding="utf-8")
-        json.dump(self.d, f, indent=4, ensure_ascii=False)
-        f.close()
+        self.guardar()
         print("Estado actualizado a", nuevo)
         return True
 
     def asignar_responsable(self, id, id_resp):
-        s = None
-        for x in self.d["solicitudes"]:
-            if x["id"] == id:
-                s = x
+        s = self.buscar_solicitud(id)
         if s == None:
             print("Error: la solicitud no existe")
             return False
@@ -141,9 +172,7 @@ class GestorSolicitudes:
             print("Error: la solicitud ya esta cerrada")
             return False
         s["responsable"] = id_resp
-        f = open("solicitudes.json", "w", encoding="utf-8")
-        json.dump(self.d, f, indent=4, ensure_ascii=False)
-        f.close()
+        self.guardar()
         print("Responsable", r["nombre"], "asignado a la solicitud", id)
         return True
 
@@ -162,9 +191,7 @@ class GestorSolicitudes:
                 if x["tipo"] == valor:
                     l.append(x)
         elif filtro == "legajo":
-            # Valida el legajo antes de buscar
-            if valor == "" or len(valor) != 5 or not valor.isdigit():
-                print("Error: legajo invalido")
+            if not self.validar_legajo(valor):
                 return None
             for x in self.d["solicitudes"]:
                 if x["legajo"] == valor:
@@ -232,7 +259,7 @@ class GestorSolicitudes:
                 tp = input("Tipo (CERTIFICADO/EQUIVALENCIA/RECLAMO/CONSTANCIA): ").upper()
                 pr = input("Prioridad (ALTA/MEDIA/BAJA): ").upper()
                 ds = input("Descripcion: ")
-                self.registrar_solicitud(lg, nm, em, tp, pr, ds)
+                self.registrar_solicitud(SolicitudNueva(lg, nm, em, tp, pr, ds))
             elif op == "2":
                 try:
                     i = int(input("Id de la solicitud: "))
@@ -261,5 +288,9 @@ class GestorSolicitudes:
 
 
 if __name__ == "__main__":
-    g = GestorSolicitudes()
-    g.menu()
+    try:
+        g = GestorSolicitudes(RepositorioJSON("solicitudes.json"))
+    except ValueError as error:
+        print(error)
+    else:
+        g.menu()
