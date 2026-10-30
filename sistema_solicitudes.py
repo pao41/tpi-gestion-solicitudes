@@ -125,6 +125,7 @@ class GestorSolicitudes:
         return None
 
     def registrar_solicitud(self, solicitud):
+        # Valida los datos, registra la solicitud y la guarda
         if not self.validar_estudiante(solicitud):
             return -1
         if not self.validar_solicitud(solicitud):
@@ -148,8 +149,9 @@ class GestorSolicitudes:
         return nuevo_id
 
     def cambiar_estado(self, id_solicitud, nuevo_estado):
+        # Cambia el estado de la solicitud si la transicion esta permitida
         solicitud = self.buscar_solicitud(id_solicitud)
-        if solicitud == None:
+        if solicitud is None:
             print("Error: la solicitud no existe")
             return False
         # Controla las transiciones permitidas segun la tabla de transiciones
@@ -159,7 +161,7 @@ class GestorSolicitudes:
         if nuevo_estado not in TRANSICIONES[solicitud["estado"]]:
             print("Error: transicion no permitida")
             return False
-        if nuevo_estado in ESTADOS_QUE_REQUIEREN_RESPONSABLE and solicitud["responsable"] == None:
+        if nuevo_estado in ESTADOS_QUE_REQUIEREN_RESPONSABLE and solicitud["responsable"] is None:
             print("Error: la solicitud no tiene responsable")
             return False
         solicitud["estado"] = nuevo_estado
@@ -168,12 +170,13 @@ class GestorSolicitudes:
         return True
 
     def asignar_responsable(self, id_solicitud, id_responsable):
+        # Asigna un responsable a una solicitud abierta
         solicitud = self.buscar_solicitud(id_solicitud)
-        if solicitud == None:
+        if solicitud is None:
             print("Error: la solicitud no existe")
             return False
         responsable = self.buscar_responsable(id_responsable)
-        if responsable == None:
+        if responsable is None:
             print("Error: el responsable no existe")
             return False
         if solicitud["estado"] in ESTADOS_CERRADOS:
@@ -185,6 +188,7 @@ class GestorSolicitudes:
         return True
 
     def buscar(self, filtro, valor):
+        # Devuelve las solicitudes que coinciden con el filtro indicado
         resultado = []
         if filtro in FILTROS_SIMPLES:
             for solicitud in self.datos["solicitudes"]:
@@ -207,6 +211,7 @@ class GestorSolicitudes:
         return resultado
 
     def reporte(self):
+        # Muestra y devuelve la cantidad de solicitudes por estado, prioridad y responsable
         cantidad_por_estado = {}
         for estado in ESTADOS:
             cantidad_por_estado[estado] = 0
