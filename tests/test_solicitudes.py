@@ -8,6 +8,7 @@ import pytest
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from sistema_solicitudes import GestorSolicitudes, SolicitudNueva
+from repositorio import RepositorioJSON
 
 
 # ---------- Preparación común ----------
@@ -16,7 +17,7 @@ from sistema_solicitudes import GestorSolicitudes, SolicitudNueva
 def gestor(tmp_path, monkeypatch):
     # Ejecuta cada prueba en una carpeta temporal con un archivo JSON limpio
     monkeypatch.chdir(tmp_path)
-    return GestorSolicitudes()
+    return GestorSolicitudes(RepositorioJSON("solicitudes.json"))
 
 
 def registrar(gestor, legajo="10234", nombre="Ana Perez", email="ana.perez@mail.com",
@@ -246,7 +247,7 @@ def test_datos_se_conservan_al_reiniciar(gestor):
     # Arrange
     registrar(gestor)
     # Act: se crea un nuevo gestor, como si se reiniciara la aplicación
-    otro_gestor = GestorSolicitudes()
+    otro_gestor = GestorSolicitudes(RepositorioJSON("solicitudes.json"))
     resultado = otro_gestor.buscar("legajo", "10234")
     # Assert
     assert len(resultado) == 1

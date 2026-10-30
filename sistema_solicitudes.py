@@ -1,6 +1,7 @@
-import json
 from dataclasses import dataclass
 from datetime import datetime
+
+from repositorio import RepositorioJSON
 
 
 @dataclass
@@ -16,10 +17,13 @@ class SolicitudNueva:
 
 class GestorSolicitudes:
 
-    def __init__(self):
-        self.d = {"estudiantes": [], "responsables": [], "solicitudes": []}
-        self.cargar()
-        # Carga responsables iniciales si el archivo esta vacio
+    def __init__(self, repositorio):
+        # Recibe el repositorio que se encarga de guardar los datos
+        self.repositorio = repositorio
+        self.d = self.repositorio.cargar()
+        if self.d is None:
+            self.d = {"estudiantes": [], "responsables": [], "solicitudes": []}
+        # Carga responsables iniciales si no hay ninguno
         if len(self.d["responsables"]) == 0:
             self.d["responsables"] = [
                 {"id": 1, "nombre": "Laura Gomez", "area": "BEDELIA"},
@@ -28,18 +32,9 @@ class GestorSolicitudes:
             ]
             self.guardar()
 
-    def cargar(self):
-        try:
-            f = open("solicitudes.json", "r", encoding="utf-8")
-            self.d = json.load(f)
-            f.close()
-        except:
-            pass
-
     def guardar(self):
-        f = open("solicitudes.json", "w", encoding="utf-8")
-        json.dump(self.d, f, indent=4, ensure_ascii=False)
-        f.close()
+        # Delega el guardado de los datos en el repositorio
+        self.repositorio.guardar(self.d)
 
     def validar_legajo(self, legajo):
         # Verifica que el legajo tenga cinco digitos
@@ -293,5 +288,9 @@ class GestorSolicitudes:
 
 
 if __name__ == "__main__":
-    g = GestorSolicitudes()
-    g.menu()
+    try:
+        g = GestorSolicitudes(RepositorioJSON("solicitudes.json"))
+    except ValueError as error:
+        print(error)
+    else:
+        g.menu()
