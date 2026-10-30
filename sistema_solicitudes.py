@@ -3,6 +3,27 @@ from datetime import datetime
 
 from repositorio import RepositorioJSON
 
+# Valores permitidos del sistema
+TIPOS = ["CERTIFICADO", "EQUIVALENCIA", "RECLAMO", "CONSTANCIA"]
+PRIORIDADES = ["ALTA", "MEDIA", "BAJA"]
+ESTADOS = ["PENDIENTE", "EN_PROCESO", "RESUELTA", "RECHAZADA"]
+ESTADO_INICIAL = "PENDIENTE"
+ESTADOS_CERRADOS = ["RESUELTA", "RECHAZADA"]
+ESTADOS_QUE_REQUIEREN_RESPONSABLE = ["EN_PROCESO"]
+FILTROS_SIMPLES = ["estado", "prioridad", "tipo"]
+ARCHIVO_DATOS = "solicitudes.json"
+
+# Dias de plazo segun la prioridad
+PLAZOS = {"ALTA": 2, "MEDIA": 5, "BAJA": 10}
+
+# Estados a los que puede pasar cada estado
+TRANSICIONES = {
+    "PENDIENTE": ["EN_PROCESO", "RECHAZADA"],
+    "EN_PROCESO": ["RESUELTA", "RECHAZADA"],
+    "RESUELTA": [],
+    "RECHAZADA": [],
+}
+
 
 @dataclass
 class SolicitudNueva:
@@ -57,12 +78,10 @@ class GestorSolicitudes:
 
     def validar_solicitud(self, solicitud):
         # Valida los datos de la solicitud
-        tipo = solicitud.tipo
-        prioridad = solicitud.prioridad
-        if tipo != "CERTIFICADO" and tipo != "EQUIVALENCIA" and tipo != "RECLAMO" and tipo != "CONSTANCIA":
+        if solicitud.tipo not in TIPOS:
             print("Error: tipo invalido")
             return False
-        if prioridad != "ALTA" and prioridad != "MEDIA" and prioridad != "BAJA":
+        if solicitud.prioridad not in PRIORIDADES:
             print("Error: prioridad invalida")
             return False
         if solicitud.descripcion == "":
@@ -89,12 +108,7 @@ class GestorSolicitudes:
 
     def calcular_plazo(self, prioridad):
         # Devuelve los dias de plazo segun la prioridad
-        if prioridad == "ALTA":
-            return 2
-        elif prioridad == "MEDIA":
-            return 5
-        else:
-            return 10
+        return PLAZOS[prioridad]
 
     def buscar_solicitud(self, id):
         # Devuelve la solicitud con el id indicado o None si no existe
@@ -116,7 +130,7 @@ class GestorSolicitudes:
             "tipo": solicitud.tipo,
             "prioridad": solicitud.prioridad,
             "descripcion": solicitud.descripcion,
-            "estado": "PENDIENTE",
+            "estado": ESTADO_INICIAL,
             "responsable": None,
             "fecha": datetime.now().strftime("%d/%m/%Y"),
             "plazo": self.calcular_plazo(solicitud.prioridad),
@@ -131,27 +145,17 @@ class GestorSolicitudes:
         if s == None:
             print("Error: la solicitud no existe")
             return False
-        # Controla las transiciones permitidas entre estados
-        if s["estado"] == "PENDIENTE":
-            if nuevo == "EN_PROCESO":
-                if s["responsable"] == None:
-                    print("Error: la solicitud no tiene responsable")
-                    return False
-                s["estado"] = nuevo
-            elif nuevo == "RECHAZADA":
-                s["estado"] = nuevo
-            else:
-                print("Error: transicion no permitida")
-                return False
-        elif s["estado"] == "EN_PROCESO":
-            if nuevo == "RESUELTA" or nuevo == "RECHAZADA":
-                s["estado"] = nuevo
-            else:
-                print("Error: transicion no permitida")
-                return False
-        elif s["estado"] == "RESUELTA" or s["estado"] == "RECHAZADA":
+        # Controla las transiciones permitidas segun la tabla de transiciones
+        if s["estado"] in ESTADOS_CERRADOS:
             print("Error: la solicitud ya esta cerrada")
             return False
+        if nuevo not in TRANSICIONES[s["estado"]]:
+            print("Error: transicion no permitida")
+            return False
+        if nuevo in ESTADOS_QUE_REQUIEREN_RESPONSABLE and s["responsable"] == None:
+            print("Error: la solicitud no tiene responsable")
+            return False
+        s["estado"] = nuevo
         self.guardar()
         print("Estado actualizado a", nuevo)
         return True
@@ -168,7 +172,7 @@ class GestorSolicitudes:
         if r == None:
             print("Error: el responsable no existe")
             return False
-        if s["estado"] == "RESUELTA" or s["estado"] == "RECHAZADA":
+        if s["estado"] in ESTADOS_CERRADOS:
             print("Error: la solicitud ya esta cerrada")
             return False
         s["responsable"] = id_resp
@@ -178,17 +182,9 @@ class GestorSolicitudes:
 
     def buscar(self, filtro, valor):
         l = []
-        if filtro == "estado":
+        if filtro in FILTROS_SIMPLES:
             for x in self.d["solicitudes"]:
-                if x["estado"] == valor:
-                    l.append(x)
-        elif filtro == "prioridad":
-            for x in self.d["solicitudes"]:
-                if x["prioridad"] == valor:
-                    l.append(x)
-        elif filtro == "tipo":
-            for x in self.d["solicitudes"]:
-                if x["tipo"] == valor:
+                if x[filtro] == valor:
                     l.append(x)
         elif filtro == "legajo":
             if not self.validar_legajo(valor):
@@ -206,40 +202,31 @@ class GestorSolicitudes:
         return l
 
     def reporte(self):
-        p = 0
-        e = 0
-        r = 0
-        rc = 0
-        a = 0
-        m = 0
-        b = 0
+        p = {}
+        for e in ESTADOS:
+            p[e] = 0
+        a = {}
+        for pr in PRIORIDADES:
+            a[pr] = 0
+        # Cuenta las solicitudes por estado y por prioridad
         for x in self.d["solicitudes"]:
-            if x["estado"] == "PENDIENTE":
-                p = p + 1
-            elif x["estado"] == "EN_PROCESO":
-                e = e + 1
-            elif x["estado"] == "RESUELTA":
-                r = r + 1
-            elif x["estado"] == "RECHAZADA":
-                rc = rc + 1
-            if x["prioridad"] == "ALTA":
-                a = a + 1
-            elif x["prioridad"] == "MEDIA":
-                m = m + 1
-            else:
-                b = b + 1
+            p[x["estado"]] = p[x["estado"]] + 1
+            a[x["prioridad"]] = a[x["prioridad"]] + 1
         print("===== REPORTE DE SOLICITUDES =====")
         print("Total:", len(self.d["solicitudes"]))
-        print("Pendientes:", p, "| En proceso:", e, "| Resueltas:", r, "| Rechazadas:", rc)
-        print("Prioridad alta:", a, "| media:", m, "| baja:", b)
+        print("Pendientes:", p["PENDIENTE"], "| En proceso:", p["EN_PROCESO"],
+              "| Resueltas:", p["RESUELTA"], "| Rechazadas:", p["RECHAZADA"])
+        print("Prioridad alta:", a["ALTA"], "| media:", a["MEDIA"], "| baja:", a["BAJA"])
         for x in self.d["responsables"]:
             c = 0
             for y in self.d["solicitudes"]:
                 if y["responsable"] == x["id"]:
                     c = c + 1
             print(x["nombre"], "(" + x["area"] + "):", c, "solicitudes asignadas")
-        return {"total": len(self.d["solicitudes"]), "PENDIENTE": p, "EN_PROCESO": e,
-                "RESUELTA": r, "RECHAZADA": rc, "ALTA": a, "MEDIA": m, "BAJA": b}
+        r = {"total": len(self.d["solicitudes"])}
+        r.update(p)
+        r.update(a)
+        return r
 
     def obtener_responsables(self):
         # Devuelve la lista de responsables disponibles
@@ -321,7 +308,7 @@ class MenuConsola:
 
 if __name__ == "__main__":
     try:
-        g = GestorSolicitudes(RepositorioJSON("solicitudes.json"))
+        g = GestorSolicitudes(RepositorioJSON(ARCHIVO_DATOS))
     except ValueError as error:
         print(error)
     else:
