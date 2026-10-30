@@ -41,12 +41,12 @@ class GestorSolicitudes:
     def __init__(self, repositorio):
         # Recibe el repositorio que se encarga de guardar los datos
         self.repositorio = repositorio
-        self.d = self.repositorio.cargar()
-        if self.d is None:
-            self.d = {"estudiantes": [], "responsables": [], "solicitudes": []}
+        self.datos = self.repositorio.cargar()
+        if self.datos is None:
+            self.datos = {"estudiantes": [], "responsables": [], "solicitudes": []}
         # Carga responsables iniciales si no hay ninguno
-        if len(self.d["responsables"]) == 0:
-            self.d["responsables"] = [
+        if len(self.datos["responsables"]) == 0:
+            self.datos["responsables"] = [
                 {"id": 1, "nombre": "Laura Gomez", "area": "BEDELIA"},
                 {"id": 2, "nombre": "Martin Ruiz", "area": "SECRETARIA ACADEMICA"},
                 {"id": 3, "nombre": "Carla Diaz", "area": "ALUMNADO"},
@@ -55,7 +55,7 @@ class GestorSolicitudes:
 
     def guardar(self):
         # Delega el guardado de los datos en el repositorio
-        self.repositorio.guardar(self.d)
+        self.repositorio.guardar(self.datos)
 
     def validar_legajo(self, legajo):
         # Verifica que el legajo tenga cinco digitos
@@ -91,30 +91,37 @@ class GestorSolicitudes:
 
     def buscar_o_crear_estudiante(self, solicitud):
         # Busca el estudiante por legajo y lo agrega si no existe
-        for e in self.d["estudiantes"]:
-            if e["legajo"] == solicitud.legajo:
-                return e
-        est = {"legajo": solicitud.legajo, "nombre": solicitud.nombre, "email": solicitud.email}
-        self.d["estudiantes"].append(est)
-        return est
+        for estudiante in self.datos["estudiantes"]:
+            if estudiante["legajo"] == solicitud.legajo:
+                return estudiante
+        nuevo_estudiante = {"legajo": solicitud.legajo, "nombre": solicitud.nombre, "email": solicitud.email}
+        self.datos["estudiantes"].append(nuevo_estudiante)
+        return nuevo_estudiante
 
     def generar_id(self):
         # Calcula el siguiente id disponible
-        n = 1
-        for s in self.d["solicitudes"]:
-            if s["id"] >= n:
-                n = s["id"] + 1
-        return n
+        siguiente_id = 1
+        for solicitud in self.datos["solicitudes"]:
+            if solicitud["id"] >= siguiente_id:
+                siguiente_id = solicitud["id"] + 1
+        return siguiente_id
 
     def calcular_plazo(self, prioridad):
         # Devuelve los dias de plazo segun la prioridad
         return PLAZOS[prioridad]
 
-    def buscar_solicitud(self, id):
+    def buscar_solicitud(self, id_solicitud):
         # Devuelve la solicitud con el id indicado o None si no existe
-        for x in self.d["solicitudes"]:
-            if x["id"] == id:
-                return x
+        for solicitud in self.datos["solicitudes"]:
+            if solicitud["id"] == id_solicitud:
+                return solicitud
+        return None
+
+    def buscar_responsable(self, id_responsable):
+        # Devuelve el responsable con el id indicado o None si no existe
+        for responsable in self.datos["responsables"]:
+            if responsable["id"] == id_responsable:
+                return responsable
         return None
 
     def registrar_solicitud(self, solicitud):
@@ -123,9 +130,9 @@ class GestorSolicitudes:
         if not self.validar_solicitud(solicitud):
             return -1
         self.buscar_o_crear_estudiante(solicitud)
-        n = self.generar_id()
-        s = {
-            "id": n,
+        nuevo_id = self.generar_id()
+        solicitud_registrada = {
+            "id": nuevo_id,
             "legajo": solicitud.legajo,
             "tipo": solicitud.tipo,
             "prioridad": solicitud.prioridad,
@@ -135,102 +142,101 @@ class GestorSolicitudes:
             "fecha": datetime.now().strftime("%d/%m/%Y"),
             "plazo": self.calcular_plazo(solicitud.prioridad),
         }
-        self.d["solicitudes"].append(s)
+        self.datos["solicitudes"].append(solicitud_registrada)
         self.guardar()
-        print("Solicitud registrada con id", n)
-        return n
+        print("Solicitud registrada con id", nuevo_id)
+        return nuevo_id
 
-    def cambiar_estado(self, id, nuevo):
-        s = self.buscar_solicitud(id)
-        if s == None:
+    def cambiar_estado(self, id_solicitud, nuevo_estado):
+        solicitud = self.buscar_solicitud(id_solicitud)
+        if solicitud == None:
             print("Error: la solicitud no existe")
             return False
         # Controla las transiciones permitidas segun la tabla de transiciones
-        if s["estado"] in ESTADOS_CERRADOS:
+        if solicitud["estado"] in ESTADOS_CERRADOS:
             print("Error: la solicitud ya esta cerrada")
             return False
-        if nuevo not in TRANSICIONES[s["estado"]]:
+        if nuevo_estado not in TRANSICIONES[solicitud["estado"]]:
             print("Error: transicion no permitida")
             return False
-        if nuevo in ESTADOS_QUE_REQUIEREN_RESPONSABLE and s["responsable"] == None:
+        if nuevo_estado in ESTADOS_QUE_REQUIEREN_RESPONSABLE and solicitud["responsable"] == None:
             print("Error: la solicitud no tiene responsable")
             return False
-        s["estado"] = nuevo
+        solicitud["estado"] = nuevo_estado
         self.guardar()
-        print("Estado actualizado a", nuevo)
+        print("Estado actualizado a", nuevo_estado)
         return True
 
-    def asignar_responsable(self, id, id_resp):
-        s = self.buscar_solicitud(id)
-        if s == None:
+    def asignar_responsable(self, id_solicitud, id_responsable):
+        solicitud = self.buscar_solicitud(id_solicitud)
+        if solicitud == None:
             print("Error: la solicitud no existe")
             return False
-        r = None
-        for x in self.d["responsables"]:
-            if x["id"] == id_resp:
-                r = x
-        if r == None:
+        responsable = self.buscar_responsable(id_responsable)
+        if responsable == None:
             print("Error: el responsable no existe")
             return False
-        if s["estado"] in ESTADOS_CERRADOS:
+        if solicitud["estado"] in ESTADOS_CERRADOS:
             print("Error: la solicitud ya esta cerrada")
             return False
-        s["responsable"] = id_resp
+        solicitud["responsable"] = id_responsable
         self.guardar()
-        print("Responsable", r["nombre"], "asignado a la solicitud", id)
+        print("Responsable", responsable["nombre"], "asignado a la solicitud", id_solicitud)
         return True
 
     def buscar(self, filtro, valor):
-        l = []
+        resultado = []
         if filtro in FILTROS_SIMPLES:
-            for x in self.d["solicitudes"]:
-                if x[filtro] == valor:
-                    l.append(x)
+            for solicitud in self.datos["solicitudes"]:
+                if solicitud[filtro] == valor:
+                    resultado.append(solicitud)
         elif filtro == "legajo":
             if not self.validar_legajo(valor):
                 return None
-            for x in self.d["solicitudes"]:
-                if x["legajo"] == valor:
-                    l.append(x)
+            for solicitud in self.datos["solicitudes"]:
+                if solicitud["legajo"] == valor:
+                    resultado.append(solicitud)
         else:
             print("Error: filtro invalido")
             return None
-        for x in l:
-            print(x["id"], "-", x["tipo"], "-", x["prioridad"], "-", x["estado"], "-", x["legajo"])
-        if len(l) == 0:
+        for solicitud in resultado:
+            print(solicitud["id"], "-", solicitud["tipo"], "-", solicitud["prioridad"], "-",
+                  solicitud["estado"], "-", solicitud["legajo"])
+        if len(resultado) == 0:
             print("No se encontraron solicitudes")
-        return l
+        return resultado
 
     def reporte(self):
-        p = {}
-        for e in ESTADOS:
-            p[e] = 0
-        a = {}
-        for pr in PRIORIDADES:
-            a[pr] = 0
+        cantidad_por_estado = {}
+        for estado in ESTADOS:
+            cantidad_por_estado[estado] = 0
+        cantidad_por_prioridad = {}
+        for prioridad in PRIORIDADES:
+            cantidad_por_prioridad[prioridad] = 0
         # Cuenta las solicitudes por estado y por prioridad
-        for x in self.d["solicitudes"]:
-            p[x["estado"]] = p[x["estado"]] + 1
-            a[x["prioridad"]] = a[x["prioridad"]] + 1
+        for solicitud in self.datos["solicitudes"]:
+            cantidad_por_estado[solicitud["estado"]] = cantidad_por_estado[solicitud["estado"]] + 1
+            cantidad_por_prioridad[solicitud["prioridad"]] = cantidad_por_prioridad[solicitud["prioridad"]] + 1
         print("===== REPORTE DE SOLICITUDES =====")
-        print("Total:", len(self.d["solicitudes"]))
-        print("Pendientes:", p["PENDIENTE"], "| En proceso:", p["EN_PROCESO"],
-              "| Resueltas:", p["RESUELTA"], "| Rechazadas:", p["RECHAZADA"])
-        print("Prioridad alta:", a["ALTA"], "| media:", a["MEDIA"], "| baja:", a["BAJA"])
-        for x in self.d["responsables"]:
-            c = 0
-            for y in self.d["solicitudes"]:
-                if y["responsable"] == x["id"]:
-                    c = c + 1
-            print(x["nombre"], "(" + x["area"] + "):", c, "solicitudes asignadas")
-        r = {"total": len(self.d["solicitudes"])}
-        r.update(p)
-        r.update(a)
-        return r
+        print("Total:", len(self.datos["solicitudes"]))
+        print("Pendientes:", cantidad_por_estado["PENDIENTE"], "| En proceso:", cantidad_por_estado["EN_PROCESO"],
+              "| Resueltas:", cantidad_por_estado["RESUELTA"], "| Rechazadas:", cantidad_por_estado["RECHAZADA"])
+        print("Prioridad alta:", cantidad_por_prioridad["ALTA"], "| media:", cantidad_por_prioridad["MEDIA"],
+              "| baja:", cantidad_por_prioridad["BAJA"])
+        for responsable in self.datos["responsables"]:
+            cantidad_asignadas = 0
+            for solicitud in self.datos["solicitudes"]:
+                if solicitud["responsable"] == responsable["id"]:
+                    cantidad_asignadas = cantidad_asignadas + 1
+            print(responsable["nombre"], "(" + responsable["area"] + "):", cantidad_asignadas, "solicitudes asignadas")
+        resumen = {"total": len(self.datos["solicitudes"])}
+        resumen.update(cantidad_por_estado)
+        resumen.update(cantidad_por_prioridad)
+        return resumen
 
     def obtener_responsables(self):
         # Devuelve la lista de responsables disponibles
-        return self.d["responsables"]
+        return self.datos["responsables"]
 
 
 class MenuConsola:
@@ -258,58 +264,58 @@ class MenuConsola:
 
     def opcion_registrar(self):
         # Pide los datos y registra una nueva solicitud
-        lg = input("Legajo: ")
-        nm = input("Nombre: ")
-        em = input("Email: ")
-        tp = input("Tipo (CERTIFICADO/EQUIVALENCIA/RECLAMO/CONSTANCIA): ").upper()
-        pr = input("Prioridad (ALTA/MEDIA/BAJA): ").upper()
-        ds = input("Descripcion: ")
-        self.gestor.registrar_solicitud(SolicitudNueva(lg, nm, em, tp, pr, ds))
+        legajo = input("Legajo: ")
+        nombre = input("Nombre: ")
+        email = input("Email: ")
+        tipo = input("Tipo (CERTIFICADO/EQUIVALENCIA/RECLAMO/CONSTANCIA): ").upper()
+        prioridad = input("Prioridad (ALTA/MEDIA/BAJA): ").upper()
+        descripcion = input("Descripcion: ")
+        self.gestor.registrar_solicitud(SolicitudNueva(legajo, nombre, email, tipo, prioridad, descripcion))
 
     def opcion_cambiar_estado(self):
         # Pide la solicitud y el nuevo estado
-        i = self.leer_numero("Id de la solicitud: ")
-        nv = input("Nuevo estado (EN_PROCESO/RESUELTA/RECHAZADA): ").upper()
-        self.gestor.cambiar_estado(i, nv)
+        id_solicitud = self.leer_numero("Id de la solicitud: ")
+        nuevo_estado = input("Nuevo estado (EN_PROCESO/RESUELTA/RECHAZADA): ").upper()
+        self.gestor.cambiar_estado(id_solicitud, nuevo_estado)
 
     def opcion_asignar_responsable(self):
         # Muestra los responsables y asigna uno a la solicitud
-        for x in self.gestor.obtener_responsables():
-            print(x["id"], "-", x["nombre"], "-", x["area"])
-        i = self.leer_numero("Id de la solicitud: ")
-        j = self.leer_numero("Id del responsable: ")
-        self.gestor.asignar_responsable(i, j)
+        for responsable in self.gestor.obtener_responsables():
+            print(responsable["id"], "-", responsable["nombre"], "-", responsable["area"])
+        id_solicitud = self.leer_numero("Id de la solicitud: ")
+        id_responsable = self.leer_numero("Id del responsable: ")
+        self.gestor.asignar_responsable(id_solicitud, id_responsable)
 
     def opcion_buscar(self):
         # Pide el filtro y el valor de busqueda
-        fl = input("Filtrar por (estado/prioridad/tipo/legajo): ").lower()
-        vl = input("Valor: ").upper()
-        self.gestor.buscar(fl, vl)
+        filtro = input("Filtrar por (estado/prioridad/tipo/legajo): ").lower()
+        valor = input("Valor: ").upper()
+        self.gestor.buscar(filtro, valor)
 
     def ejecutar(self):
         # Repite el menu hasta que el usuario elige salir
-        op = ""
-        while op != "0":
+        opcion = ""
+        while opcion != "0":
             self.mostrar_opciones()
-            op = input("Opcion: ")
-            if op == "1":
+            opcion = input("Opcion: ")
+            if opcion == "1":
                 self.opcion_registrar()
-            elif op == "2":
+            elif opcion == "2":
                 self.opcion_cambiar_estado()
-            elif op == "3":
+            elif opcion == "3":
                 self.opcion_asignar_responsable()
-            elif op == "4":
+            elif opcion == "4":
                 self.opcion_buscar()
-            elif op == "5":
+            elif opcion == "5":
                 self.gestor.reporte()
-            elif op != "0":
+            elif opcion != "0":
                 print("Opcion invalida")
 
 
 if __name__ == "__main__":
     try:
-        g = GestorSolicitudes(RepositorioJSON(ARCHIVO_DATOS))
+        gestor = GestorSolicitudes(RepositorioJSON(ARCHIVO_DATOS))
     except ValueError as error:
         print(error)
     else:
-        MenuConsola(g).ejecutar()
+        MenuConsola(gestor).ejecutar()
