@@ -241,48 +241,80 @@ class GestorSolicitudes:
         return {"total": len(self.d["solicitudes"]), "PENDIENTE": p, "EN_PROCESO": e,
                 "RESUELTA": r, "RECHAZADA": rc, "ALTA": a, "MEDIA": m, "BAJA": b}
 
-    def menu(self):
+    def obtener_responsables(self):
+        # Devuelve la lista de responsables disponibles
+        return self.d["responsables"]
+
+
+class MenuConsola:
+    # Se encarga de la interaccion con el usuario por consola
+
+    def __init__(self, gestor):
+        self.gestor = gestor
+
+    def mostrar_opciones(self):
+        # Muestra las opciones del menu principal
+        print("\n--- SISTEMA DE GESTION DE SOLICITUDES ACADEMICAS ---")
+        print("1. Registrar solicitud")
+        print("2. Cambiar estado")
+        print("3. Asignar responsable")
+        print("4. Buscar solicitudes")
+        print("5. Reporte")
+        print("0. Salir")
+
+    def leer_numero(self, mensaje):
+        # Lee un numero entero y devuelve 0 si el valor ingresado no es valido
+        try:
+            return int(input(mensaje))
+        except ValueError:
+            return 0
+
+    def opcion_registrar(self):
+        # Pide los datos y registra una nueva solicitud
+        lg = input("Legajo: ")
+        nm = input("Nombre: ")
+        em = input("Email: ")
+        tp = input("Tipo (CERTIFICADO/EQUIVALENCIA/RECLAMO/CONSTANCIA): ").upper()
+        pr = input("Prioridad (ALTA/MEDIA/BAJA): ").upper()
+        ds = input("Descripcion: ")
+        self.gestor.registrar_solicitud(SolicitudNueva(lg, nm, em, tp, pr, ds))
+
+    def opcion_cambiar_estado(self):
+        # Pide la solicitud y el nuevo estado
+        i = self.leer_numero("Id de la solicitud: ")
+        nv = input("Nuevo estado (EN_PROCESO/RESUELTA/RECHAZADA): ").upper()
+        self.gestor.cambiar_estado(i, nv)
+
+    def opcion_asignar_responsable(self):
+        # Muestra los responsables y asigna uno a la solicitud
+        for x in self.gestor.obtener_responsables():
+            print(x["id"], "-", x["nombre"], "-", x["area"])
+        i = self.leer_numero("Id de la solicitud: ")
+        j = self.leer_numero("Id del responsable: ")
+        self.gestor.asignar_responsable(i, j)
+
+    def opcion_buscar(self):
+        # Pide el filtro y el valor de busqueda
+        fl = input("Filtrar por (estado/prioridad/tipo/legajo): ").lower()
+        vl = input("Valor: ").upper()
+        self.gestor.buscar(fl, vl)
+
+    def ejecutar(self):
+        # Repite el menu hasta que el usuario elige salir
         op = ""
         while op != "0":
-            print("\n--- SISTEMA DE GESTION DE SOLICITUDES ACADEMICAS ---")
-            print("1. Registrar solicitud")
-            print("2. Cambiar estado")
-            print("3. Asignar responsable")
-            print("4. Buscar solicitudes")
-            print("5. Reporte")
-            print("0. Salir")
+            self.mostrar_opciones()
             op = input("Opcion: ")
             if op == "1":
-                lg = input("Legajo: ")
-                nm = input("Nombre: ")
-                em = input("Email: ")
-                tp = input("Tipo (CERTIFICADO/EQUIVALENCIA/RECLAMO/CONSTANCIA): ").upper()
-                pr = input("Prioridad (ALTA/MEDIA/BAJA): ").upper()
-                ds = input("Descripcion: ")
-                self.registrar_solicitud(SolicitudNueva(lg, nm, em, tp, pr, ds))
+                self.opcion_registrar()
             elif op == "2":
-                try:
-                    i = int(input("Id de la solicitud: "))
-                except:
-                    i = 0
-                nv = input("Nuevo estado (EN_PROCESO/RESUELTA/RECHAZADA): ").upper()
-                self.cambiar_estado(i, nv)
+                self.opcion_cambiar_estado()
             elif op == "3":
-                for x in self.d["responsables"]:
-                    print(x["id"], "-", x["nombre"], "-", x["area"])
-                try:
-                    i = int(input("Id de la solicitud: "))
-                    j = int(input("Id del responsable: "))
-                except:
-                    i = 0
-                    j = 0
-                self.asignar_responsable(i, j)
+                self.opcion_asignar_responsable()
             elif op == "4":
-                fl = input("Filtrar por (estado/prioridad/tipo/legajo): ").lower()
-                vl = input("Valor: ").upper()
-                self.buscar(fl, vl)
+                self.opcion_buscar()
             elif op == "5":
-                self.reporte()
+                self.gestor.reporte()
             elif op != "0":
                 print("Opcion invalida")
 
@@ -293,4 +325,4 @@ if __name__ == "__main__":
     except ValueError as error:
         print(error)
     else:
-        g.menu()
+        MenuConsola(g).ejecutar()
