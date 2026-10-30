@@ -7,7 +7,7 @@ import pytest
 # Agrega la carpeta del proyecto para poder importar el sistema
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from sistema_solicitudes import GestorSolicitudes
+from sistema_solicitudes import GestorSolicitudes, SolicitudNueva
 
 
 # ---------- Preparación común ----------
@@ -22,7 +22,7 @@ def gestor(tmp_path, monkeypatch):
 def registrar(gestor, legajo="10234", nombre="Ana Perez", email="ana.perez@mail.com",
               tipo="CERTIFICADO", prioridad="ALTA", descripcion="Certificado de alumno regular"):
     # Centraliza la llamada al registro para que un cambio de firma se ajuste en un solo lugar
-    return gestor.registrar_solicitud(legajo, nombre, email, tipo, prioridad, descripcion)
+    return gestor.registrar_solicitud(SolicitudNueva(legajo, nombre, email, tipo, prioridad, descripcion))
 
 
 def leer_datos():

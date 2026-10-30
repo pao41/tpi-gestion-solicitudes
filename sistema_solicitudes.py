@@ -1,5 +1,17 @@
 import json
+from dataclasses import dataclass
 from datetime import datetime
+
+
+@dataclass
+class SolicitudNueva:
+    # Agrupa los datos necesarios para registrar una solicitud
+    legajo: str
+    nombre: str
+    email: str
+    tipo: str
+    prioridad: str
+    descripcion: str
 
 
 class GestorSolicitudes:
@@ -36,37 +48,39 @@ class GestorSolicitudes:
             return False
         return True
 
-    def validar_estudiante(self, legajo, nombre, email):
+    def validar_estudiante(self, solicitud):
         # Valida los datos del estudiante
-        if not self.validar_legajo(legajo):
+        if not self.validar_legajo(solicitud.legajo):
             return False
-        if nombre == "":
+        if solicitud.nombre == "":
             print("Error: nombre vacio")
             return False
-        if "@" not in email or "." not in email:
+        if "@" not in solicitud.email or "." not in solicitud.email:
             print("Error: email invalido")
             return False
         return True
 
-    def validar_solicitud(self, tipo, prioridad, descripcion):
+    def validar_solicitud(self, solicitud):
         # Valida los datos de la solicitud
+        tipo = solicitud.tipo
+        prioridad = solicitud.prioridad
         if tipo != "CERTIFICADO" and tipo != "EQUIVALENCIA" and tipo != "RECLAMO" and tipo != "CONSTANCIA":
             print("Error: tipo invalido")
             return False
         if prioridad != "ALTA" and prioridad != "MEDIA" and prioridad != "BAJA":
             print("Error: prioridad invalida")
             return False
-        if descripcion == "":
+        if solicitud.descripcion == "":
             print("Error: descripcion vacia")
             return False
         return True
 
-    def buscar_o_crear_estudiante(self, legajo, nombre, email):
+    def buscar_o_crear_estudiante(self, solicitud):
         # Busca el estudiante por legajo y lo agrega si no existe
         for e in self.d["estudiantes"]:
-            if e["legajo"] == legajo:
+            if e["legajo"] == solicitud.legajo:
                 return e
-        est = {"legajo": legajo, "nombre": nombre, "email": email}
+        est = {"legajo": solicitud.legajo, "nombre": solicitud.nombre, "email": solicitud.email}
         self.d["estudiantes"].append(est)
         return est
 
@@ -94,23 +108,23 @@ class GestorSolicitudes:
                 return x
         return None
 
-    def registrar_solicitud(self, legajo, nombre, email, tipo, prioridad, descripcion):
-        if not self.validar_estudiante(legajo, nombre, email):
+    def registrar_solicitud(self, solicitud):
+        if not self.validar_estudiante(solicitud):
             return -1
-        if not self.validar_solicitud(tipo, prioridad, descripcion):
+        if not self.validar_solicitud(solicitud):
             return -1
-        self.buscar_o_crear_estudiante(legajo, nombre, email)
+        self.buscar_o_crear_estudiante(solicitud)
         n = self.generar_id()
         s = {
             "id": n,
-            "legajo": legajo,
-            "tipo": tipo,
-            "prioridad": prioridad,
-            "descripcion": descripcion,
+            "legajo": solicitud.legajo,
+            "tipo": solicitud.tipo,
+            "prioridad": solicitud.prioridad,
+            "descripcion": solicitud.descripcion,
             "estado": "PENDIENTE",
             "responsable": None,
             "fecha": datetime.now().strftime("%d/%m/%Y"),
-            "plazo": self.calcular_plazo(prioridad),
+            "plazo": self.calcular_plazo(solicitud.prioridad),
         }
         self.d["solicitudes"].append(s)
         self.guardar()
@@ -250,7 +264,7 @@ class GestorSolicitudes:
                 tp = input("Tipo (CERTIFICADO/EQUIVALENCIA/RECLAMO/CONSTANCIA): ").upper()
                 pr = input("Prioridad (ALTA/MEDIA/BAJA): ").upper()
                 ds = input("Descripcion: ")
-                self.registrar_solicitud(lg, nm, em, tp, pr, ds)
+                self.registrar_solicitud(SolicitudNueva(lg, nm, em, tp, pr, ds))
             elif op == "2":
                 try:
                     i = int(input("Id de la solicitud: "))
